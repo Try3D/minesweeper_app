@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _kKey = 'settings_v1';
@@ -7,7 +7,6 @@ const _kNameMax = 16;
 
 class SettingsStore extends ChangeNotifier {
   String _playerName = 'Player';
-  ThemeMode _themeMode = ThemeMode.system;
   bool _haptics = true;
   bool _firstClickSafety = true;
   bool _showTimer = true;
@@ -15,7 +14,6 @@ class SettingsStore extends ChangeNotifier {
 
   bool get isLoaded => _loaded;
   String get playerName => _playerName;
-  ThemeMode get themeMode => _themeMode;
   bool get haptics => _haptics;
   bool get firstClickSafety => _firstClickSafety;
   bool get showTimer => _showTimer;
@@ -27,7 +25,6 @@ class SettingsStore extends ChangeNotifier {
       try {
         final j = jsonDecode(raw) as Map<String, dynamic>;
         _playerName = (j['name'] as String?) ?? _playerName;
-        _themeMode = _decodeThemeMode(j['theme'] as String?);
         _haptics = (j['haptics'] as bool?) ?? _haptics;
         _firstClickSafety =
             (j['firstClickSafety'] as bool?) ?? _firstClickSafety;
@@ -46,7 +43,6 @@ class SettingsStore extends ChangeNotifier {
       _kKey,
       jsonEncode({
         'name': _playerName,
-        'theme': _encodeThemeMode(_themeMode),
         'haptics': _haptics,
         'firstClickSafety': _firstClickSafety,
         'showTimer': _showTimer,
@@ -60,13 +56,6 @@ class SettingsStore extends ChangeNotifier {
     if (v.isEmpty) v = 'Player';
     if (v == _playerName) return;
     _playerName = v;
-    notifyListeners();
-    await _save();
-  }
-
-  Future<void> setThemeMode(ThemeMode mode) async {
-    if (mode == _themeMode) return;
-    _themeMode = mode;
     notifyListeners();
     await _save();
   }
@@ -94,7 +83,6 @@ class SettingsStore extends ChangeNotifier {
 
   Future<void> resetAll() async {
     _playerName = 'Player';
-    _themeMode = ThemeMode.system;
     _haptics = true;
     _firstClickSafety = true;
     _showTimer = true;
@@ -103,15 +91,3 @@ class SettingsStore extends ChangeNotifier {
     await prefs.remove(_kKey);
   }
 }
-
-String _encodeThemeMode(ThemeMode m) => switch (m) {
-      ThemeMode.light => 'light',
-      ThemeMode.dark => 'dark',
-      ThemeMode.system => 'system',
-    };
-
-ThemeMode _decodeThemeMode(String? s) => switch (s) {
-      'light' => ThemeMode.light,
-      'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
-    };

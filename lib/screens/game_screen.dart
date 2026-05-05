@@ -4,8 +4,10 @@ import 'package:flutter/services.dart';
 import '../app_scope.dart';
 import '../game/board.dart';
 import '../theme.dart';
+import '../widgets/bevel.dart';
 import '../widgets/cell_widget.dart';
-import '../widgets/sketch.dart';
+import '../widgets/glyphs.dart';
+import '../widgets/led_display.dart';
 
 class GameScreen extends StatefulWidget {
   final Difficulty difficulty;
@@ -22,6 +24,7 @@ class _GameScreenState extends State<GameScreen> {
   final TransformationController _viewer = TransformationController();
   bool _viewerCentered = false;
   bool _boardInitialized = false;
+  bool _pressing = false;
 
   @override
   void didChangeDependencies() {
@@ -44,10 +47,6 @@ class _GameScreenState extends State<GameScreen> {
     final dy = (viewport.height - boardH) / 2;
     _viewer.value = Matrix4.identity()..translateByDouble(dx, dy, 0, 1);
     _viewerCentered = true;
-  }
-
-  void _resetViewer() {
-    _viewerCentered = false;
   }
 
   @override
@@ -78,13 +77,16 @@ class _GameScreenState extends State<GameScreen> {
       _seconds = 0;
       _timer?.cancel();
       _timer = null;
-      _resetViewer();
+      _viewerCentered = false;
+      _pressing = false;
     });
     _haptic(HapticFeedback.lightImpact);
   }
 
   void _handleTap(int r, int c) {
-    if (_board.status == GameStatus.won || _board.status == GameStatus.lost) return;
+    if (_board.status == GameStatus.won || _board.status == GameStatus.lost) {
+      return;
+    }
     final result = _board.reveal(r, c);
     setState(() {});
     _maybeStartTimer();
@@ -105,10 +107,10 @@ class _GameScreenState extends State<GameScreen> {
           if (_hapticsOn()) HapticFeedback.lightImpact();
         });
         AppScope.scoresOf(context).recordWin(
-          widget.difficulty,
-          seconds: _seconds,
-          playerName: AppScope.settingsOf(context).playerName,
-        );
+              widget.difficulty,
+              seconds: _seconds,
+              playerName: AppScope.settingsOf(context).playerName,
+            );
         Future.delayed(const Duration(milliseconds: 300), () {
           if (mounted) _showEndDialog(won: true);
         });
@@ -119,7 +121,9 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _handleLongPress(int r, int c) {
-    if (_board.status == GameStatus.won || _board.status == GameStatus.lost) return;
+    if (_board.status == GameStatus.won || _board.status == GameStatus.lost) {
+      return;
+    }
     final changed = _board.toggleFlag(r, c);
     if (changed) {
       _haptic(HapticFeedback.mediumImpact);
@@ -128,94 +132,83 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
+  SmileyState _smileyState() {
+    if (_board.status == GameStatus.lost) return SmileyState.lost;
+    if (_board.status == GameStatus.won) return SmileyState.won;
+    if (_pressing) return SmileyState.surprise;
+    return SmileyState.idle;
+  }
+
   @override
   Widget build(BuildContext context) {
-    const cellSize = 40.0;
+    const cellSize = 30.0;
     final boardW = widget.difficulty.width * cellSize;
     final boardH = widget.difficulty.height * cellSize;
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppColors.of(context);
+    final showTimer = AppScope.settingsOf(context).showTimer;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          // Full-screen infinite-canvas board
-          PaperBackground(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                if (!_viewerCentered) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _centerBoard(constraints.biggest, boardW, boardH);
-                  });
-                }
-                return InteractiveViewer(
-                  transformationController: _viewer,
-                  constrained: false,
-                  minScale: 0.3,
-                  maxScale: 4.0,
-                  boundaryMargin: const EdgeInsets.all(double.infinity),
-                  child: SizedBox(
-                    width: boardW,
-                    height: boardH,
-                    child: _buildGrid(cellSize),
-                  ),
-                );
-              },
-            ),
-          ),
-          // HUD overlay
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+      backgroundColor: ac.silver,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top toolbar: back button + classic HUD bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+              child: Row(
                 children: [
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SketchButton(
-                          onTap: () => Navigator.of(context).pop(),
-                          seed: 11,
-                          padding: const EdgeInsets.all(10),
-                          child: const Icon(Icons.arrow_back, size: 22),
-                        ),
-                        const SizedBox(width: 10),
-                        IgnorePointer(
-                          child: _HudBox(
-                            child: Text(
-                              _board.minesRemaining.toString().padLeft(3, '0'),
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
-                                color: cs.primary,
-                                letterSpacing: 2,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        if (AppScope.settingsOf(context).showTimer)
-                          IgnorePointer(
-                            child: _HudBox(
-                              child: Text(
-                                _formatTime(_seconds),
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: cs.onSurface,
-                                  letterSpacing: 2,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                  BevelButton(
+                    onTap: () => Navigator.of(context).pop(),
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(Icons.arrow_back,
+                        size: 18, color: Palette.ink),
                   ),
+                  const SizedBox(width: 8),
+                  Expanded(child: _Hud(
+                    minesRemaining: _board.minesRemaining,
+                    seconds: _seconds,
+                    showTimer: showTimer,
+                    smileyState: _smileyState(),
+                    onSmileyTap: _reset,
+                  )),
                 ],
               ),
             ),
-          ),
-        ],
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                child: BoardFrame(
+                  padding: const EdgeInsets.all(2),
+                  child: ClipRect(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        if (!_viewerCentered) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _centerBoard(
+                                constraints.biggest, boardW, boardH);
+                          });
+                        }
+                        return InteractiveViewer(
+                          transformationController: _viewer,
+                          constrained: false,
+                          minScale: 0.3,
+                          maxScale: 4.0,
+                          boundaryMargin:
+                              const EdgeInsets.all(double.infinity),
+                          child: SizedBox(
+                            width: boardW,
+                            height: boardH,
+                            child: _buildGrid(cellSize),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -227,12 +220,13 @@ class _GameScreenState extends State<GameScreen> {
       for (int c = 0; c < widget.difficulty.width; c++) {
         row.add(GestureDetector(
           behavior: HitTestBehavior.opaque,
+          onTapDown: (_) => setState(() => _pressing = true),
+          onTapUp: (_) => setState(() => _pressing = false),
+          onTapCancel: () => setState(() => _pressing = false),
           onTap: () => _handleTap(r, c),
           onLongPress: () => _handleLongPress(r, c),
-          child: CellWidget(
-            cell: _board.grid[r][c],
-            size: cellSize,
-            seed: r * widget.difficulty.width + c,
+          child: RepaintBoundary(
+            child: CellWidget(cell: _board.grid[r][c], size: cellSize),
           ),
         ));
       }
@@ -251,102 +245,70 @@ class _GameScreenState extends State<GameScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
+      barrierColor: Colors.black.withValues(alpha: 0.6),
       builder: (ctx) {
-        final ac = AppColors.of(ctx);
-        final cs = Theme.of(ctx).colorScheme;
         return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.all(24),
-          child: Container(
-            decoration: BoxDecoration(
-              color: cs.surface,
-              border: Border.all(color: ac.ink, width: 4),
-            ),
-            padding: const EdgeInsets.all(24),
+          child: BevelBox(
+            raised: true,
+            thickness: 3,
+            padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  won ? Icons.emoji_events : Icons.dangerous,
-                  size: 96,
-                  color: won ? cs.primary : ac.ink,
-                ),
-                const SizedBox(height: 12),
-                Transform.rotate(
-                  angle: -0.03,
-                  child: Text(
-                    won ? 'MISSION ACCOMPLISHED' : 'BOOM!',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      height: 1.1,
+                Container(
+                  width: 35,
+                  height: 35,
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: Colors.white, width: 2),
+                      left: BorderSide(color: Colors.white, width: 2),
+                      right:
+                          BorderSide(color: Color(0xFF7B7B7B), width: 2),
+                      bottom:
+                          BorderSide(color: Color(0xFF7B7B7B), width: 2),
                     ),
                   ),
+                  child: SmileyFace(
+                    size: 31,
+                    state: won ? SmileyState.won : SmileyState.lost,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  won ? 'YOU WIN' : 'GAME OVER',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(ctx).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   won
-                      ? 'Sector cleared. No casualties.'
-                      : 'You stepped on the ink.',
+                      ? 'TIME: ${_formatTime(_seconds)}'
+                      : 'BETTER LUCK NEXT TIME',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: ac.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    _StatBox(label: 'Time', value: _formatTime(_seconds)),
-                    const SizedBox(width: 8),
-                    _StatBox(
-                      label: 'Mines',
-                      value: '${_board.flagCount}/${_board.mineCount}',
-                    ),
-                  ],
+                  style: Theme.of(ctx).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 18),
                 Row(
                   children: [
                     Expanded(
-                      child: SketchButton(
+                      child: BevelButton(
                         onTap: () {
                           Navigator.of(ctx).pop();
                           _reset();
                         },
-                        background: cs.primary,
-                        foreground: cs.onPrimary,
-                        seed: 31,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        child: const Center(
-                          child: Text('PLAY AGAIN',
-                              style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1)),
-                        ),
+                        child: const Center(child: Text('PLAY AGAIN')),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: SketchButton(
+                      child: BevelButton(
                         onTap: () {
                           Navigator.of(ctx).pop();
                           Navigator.of(context).pop();
                         },
-                        background: cs.surface,
-                        seed: 32,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        child: const Center(
-                          child: Text('LEVELS',
-                              style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1)),
-                        ),
+                        child: const Center(child: Text('LEVELS')),
                       ),
                     ),
                   ],
@@ -360,56 +322,81 @@ class _GameScreenState extends State<GameScreen> {
   }
 }
 
-class _HudBox extends StatelessWidget {
-  final Widget child;
-  const _HudBox({required this.child});
+class _SmileyButton extends StatefulWidget {
+  final SmileyState state;
+  final VoidCallback onTap;
+  const _SmileyButton({required this.state, required this.onTap});
+
+  @override
+  State<_SmileyButton> createState() => _SmileyButtonState();
+}
+
+class _SmileyButtonState extends State<_SmileyButton> {
+  // Reference CSS: width/height 35px, 2px white top/left, 2px #7B7B7B
+  // bottom/right borders, no padding — sprite sits flush against bevel.
+  // On press, the bevel inverts to show a sunken button (classic Win9x).
+  static const _faceSize = 35.0;
+  static const _dark = Color(0xFF7B7B7B);
+  bool _down = false;
 
   @override
   Widget build(BuildContext context) {
-    final ac = AppColors.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: ac.surfaceLowest,
-        border: Border.all(color: ac.ink, width: 2.5),
-        boxShadow: [
-          BoxShadow(color: ac.ink, offset: const Offset(3, 3), blurRadius: 0),
-        ],
+    final topLeft = _down ? _dark : Colors.white;
+    final bottomRight = _down ? Colors.white : _dark;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _down = true),
+      onTapUp: (_) => setState(() => _down = false),
+      onTapCancel: () => setState(() => _down = false),
+      onTap: widget.onTap,
+      child: Container(
+        width: _faceSize,
+        height: _faceSize,
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: topLeft, width: 2),
+            left: BorderSide(color: topLeft, width: 2),
+            right: BorderSide(color: bottomRight, width: 2),
+            bottom: BorderSide(color: bottomRight, width: 2),
+          ),
+        ),
+        child: SmileyFace(size: _faceSize - 4, state: widget.state),
       ),
-      child: child,
     );
   }
 }
 
-class _StatBox extends StatelessWidget {
-  final String label;
-  final String value;
-  const _StatBox({required this.label, required this.value});
+class _Hud extends StatelessWidget {
+  final int minesRemaining;
+  final int seconds;
+  final bool showTimer;
+  final SmileyState smileyState;
+  final VoidCallback onSmileyTap;
+
+  const _Hud({
+    required this.minesRemaining,
+    required this.seconds,
+    required this.showTimer,
+    required this.smileyState,
+    required this.onSmileyTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final ac = AppColors.of(context);
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(
-          color: ac.surfaceContainer,
-          border: Border.all(color: ac.ink, width: 2.5),
-        ),
-        child: Column(
-          children: [
-            Text(label.toUpperCase(),
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    color: ac.onSurfaceVariant,
-                    letterSpacing: 1.2)),
-            const SizedBox(height: 4),
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.w900)),
-          ],
-        ),
+    return BevelBox(
+      raised: true,
+      thickness: 3,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          LedDisplay(value: minesRemaining),
+          _SmileyButton(state: smileyState, onTap: onSmileyTap),
+          showTimer
+              ? LedDisplay(value: seconds > 999 ? 999 : seconds)
+              : const SizedBox(width: 60),
+        ],
       ),
     );
   }

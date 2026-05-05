@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
-import '../widgets/sketch.dart';
+import '../widgets/bevel.dart';
+import '../widgets/glyphs.dart';
 import 'high_scores_screen.dart';
 import 'levels_screen.dart';
 import 'settings_screen.dart';
@@ -11,129 +12,94 @@ class MenuScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = AppColors.of(context);
-    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      body: PaperBackground(
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 8),
-                    WobblyUnderline(
-                      child: Text(
-                        'MineSweeper',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.displayLarge,
+      backgroundColor: ac.silver,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 35,
+                    height: 35,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        top: BorderSide(color: Colors.white, width: 2),
+                        left: BorderSide(color: Colors.white, width: 2),
+                        right:
+                            BorderSide(color: Color(0xFF7B7B7B), width: 2),
+                        bottom:
+                            BorderSide(color: Color(0xFF7B7B7B), width: 2),
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    Text(
-                      "Dodge the ink. Don't blow up the paper.",
+                    child: const SmileyFace(
+                        size: 31, state: SmileyState.idle),
+                  ),
+                  const SizedBox(height: 16),
+                  BevelBox(
+                    raised: true,
+                    thickness: 3,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    child: Text(
+                      'MINESWEEPER',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: ac.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.displayLarge,
                     ),
-                    const SizedBox(height: 56),
-                    SketchButton(
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const LevelsScreen()),
-                      ),
-                      background: cs.primary,
-                      foreground: cs.onPrimary,
-                      seed: 1,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 18,
-                        horizontal: 24,
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.play_arrow, size: 30),
-                          SizedBox(width: 10),
-                          Text(
-                            'NEW GRID',
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                        ],
-                      ),
+                  ),
+                  const SizedBox(height: 32),
+                  _MenuButton(
+                    label: 'NEW GAME',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const LevelsScreen()),
                     ),
-                    const SizedBox(height: 16),
-                    SketchButton(
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const HighScoresScreen()),
-                      ),
-                      background: cs.secondary,
-                      foreground: cs.onSecondary,
-                      seed: 3,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 18,
-                        horizontal: 24,
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.emoji_events, size: 26),
-                          SizedBox(width: 10),
-                          Text(
-                            'HIGH SCORES',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                        ],
-                      ),
+                  ),
+                  const SizedBox(height: 12),
+                  _MenuButton(
+                    label: 'HIGH SCORES',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const HighScoresScreen()),
                     ),
-                    const SizedBox(height: 24),
-                    SketchButton(
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const SettingsScreen()),
-                      ),
-                      background: cs.tertiary,
-                      foreground: cs.onTertiary,
-                      seed: 4,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 18,
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.settings, size: 22),
-                          SizedBox(width: 10),
-                          Text(
-                            'Options',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
+                  ),
+                  const SizedBox(height: 12),
+                  _MenuButton(
+                    label: 'OPTIONS',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const SettingsScreen()),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _MenuButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: BevelButton(
+        onTap: onTap,
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        child: Center(
+          child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
         ),
       ),
     );

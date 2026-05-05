@@ -3,7 +3,8 @@ import '../app_scope.dart';
 import '../data/scores_store.dart';
 import '../game/board.dart';
 import '../theme.dart';
-import '../widgets/sketch.dart';
+import '../widgets/bevel.dart';
+import '../widgets/led_display.dart';
 
 class HighScoresScreen extends StatelessWidget {
   const HighScoresScreen({super.key});
@@ -11,51 +12,55 @@ class HighScoresScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scores = AppScope.scoresOf(context);
+    final ac = AppColors.of(context);
 
     return Scaffold(
-      body: PaperBackground(
-        child: SafeArea(
-          child: ListenableBuilder(
-            listenable: scores,
-            builder: (context, _) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        SketchButton(
-                          onTap: () => Navigator.of(context).pop(),
-                          seed: 7,
-                          padding: const EdgeInsets.all(10),
-                          child: const Icon(Icons.arrow_back, size: 22),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Center(
-                      child: WobblyUnderline(
-                        child: Text(
-                          'High Scores',
-                          style: Theme.of(context).textTheme.displayLarge,
-                        ),
+      backgroundColor: ac.silver,
+      body: SafeArea(
+        child: ListenableBuilder(
+          listenable: scores,
+          builder: (context, _) {
+            return SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      BevelButton(
+                        onTap: () => Navigator.of(context).pop(),
+                        padding: const EdgeInsets.all(8),
+                        child: const Icon(Icons.arrow_back,
+                            size: 18, color: Palette.ink),
                       ),
-                    ),
-                    const SizedBox(height: 28),
-                    for (final d in Difficulty.all) ...[
-                      _ScoreCard(
-                        difficulty: d,
-                        stats: scores.forDifficulty(d),
-                      ),
-                      const SizedBox(height: 16),
                     ],
-                    const SizedBox(height: 8),
+                  ),
+                  const SizedBox(height: 18),
+                  Center(
+                    child: BevelBox(
+                      raised: true,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      child: Text(
+                        'HIGH SCORES',
+                        style: Theme.of(context).textTheme.headlineMedium,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  for (final d in Difficulty.all) ...[
+                    _ScoreCard(
+                      difficulty: d,
+                      stats: scores.forDifficulty(d),
+                    ),
+                    const SizedBox(height: 12),
                   ],
-                ),
-              );
-            },
-          ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
@@ -69,87 +74,50 @@ class _ScoreCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ac = AppColors.of(context);
-    final cs = Theme.of(context).colorScheme;
     final best = stats.bestSeconds;
     final winRate = stats.played == 0
-        ? '—'
-        : '${stats.won}/${stats.played} · ${(stats.won * 100 / stats.played).round()}%';
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: ac.surfaceLowest,
-        border: Border.all(color: ac.ink, width: 3),
-        boxShadow: [
-          BoxShadow(color: ac.ink, offset: const Offset(4, 4), blurRadius: 0),
-        ],
-      ),
+        ? '--'
+        : '${stats.won}/${stats.played}';
+    return BevelBox(
+      raised: true,
+      thickness: 3,
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             difficulty.name.toUpperCase(),
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 2,
-              color: ac.onSurfaceVariant,
-            ),
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 12),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                best == null ? '--:--' : _format(best),
-                style: TextStyle(
-                  fontSize: 56,
-                  fontWeight: FontWeight.w900,
-                  height: 1.0,
-                  letterSpacing: -1.5,
-                  color: cs.primary,
-                ),
+              LedDisplay(
+                value: best ?? 0,
+                digitWidth: 22,
+                digitHeight: 36,
               ),
-              const SizedBox(width: 12),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  best == null ? 'NO RECORD' : 'BEST',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.4,
-                    color: ac.onSurfaceVariant,
-                  ),
-                ),
+              const SizedBox(width: 10),
+              Text(
+                best == null ? 'NO RECORD' : 'BEST',
+                style: Theme.of(context).textTheme.labelLarge,
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Container(height: 2, color: ac.ink),
-          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('WIN RATE',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.2,
-                      color: ac.onSurfaceVariant)),
-              Text(winRate,
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w900)),
+              Text('WIN/PLAYED',
+                  style: Theme.of(context).textTheme.labelLarge),
+              Text(winRate, style: Theme.of(context).textTheme.bodyMedium),
             ],
           ),
           if (stats.recentWins.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text('RECENT WINS',
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.2,
-                    color: ac.onSurfaceVariant)),
+                style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 6),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -157,18 +125,17 @@ class _ScoreCard extends StatelessWidget {
                 children: [
                   for (final w in stats.recentWins.take(5))
                     Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Container(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: BevelBox(
+                        raised: false,
+                        thickness: 2,
+                        fill: Palette.cellRevealed,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: ac.surfaceContainer,
-                          border: Border.all(color: ac.ink, width: 1.5),
-                        ),
+                            horizontal: 8, vertical: 6),
                         child: Text(
                           _format(w.seconds),
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w900),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),
                     ),

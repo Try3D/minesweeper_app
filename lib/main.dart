@@ -37,18 +37,11 @@ class _MinesweeperAppState extends State<MinesweeperApp> {
     return AppScope(
       settings: _settings,
       scores: _scores,
-      child: ListenableBuilder(
-        listenable: _settings,
-        builder: (context, _) {
-          return MaterialApp(
-            title: 'MineSweeper',
-            debugShowCheckedModeBanner: false,
-            theme: buildTheme(),
-            darkTheme: buildDarkTheme(),
-            themeMode: _settings.themeMode,
-            home: const MenuScreen(),
-          );
-        },
+      child: MaterialApp(
+        title: 'Minesweeper',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        home: const MenuScreen(),
       ),
     );
   }
