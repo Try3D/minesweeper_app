@@ -83,7 +83,7 @@ class _BevelPainter extends CustomPainter {
 
 // A tappable raised bevel button that depresses (sunken) on press.
 class BevelButton extends StatefulWidget {
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final Widget child;
   final EdgeInsetsGeometry padding;
   final double thickness;
@@ -107,11 +107,12 @@ class _BevelButtonState extends State<BevelButton> {
 
   @override
   Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _down = true),
-      onTapUp: (_) => setState(() => _down = false),
-      onTapCancel: () => setState(() => _down = false),
+      onTapDown: enabled ? (_) => setState(() => _down = true) : null,
+      onTapUp: enabled ? (_) => setState(() => _down = false) : null,
+      onTapCancel: enabled ? () => setState(() => _down = false) : null,
       onTap: widget.onTap,
       child: BevelBox(
         raised: !_down,
@@ -120,6 +121,40 @@ class _BevelButtonState extends State<BevelButton> {
         padding: widget.padding,
         child: widget.child,
       ),
+    );
+  }
+}
+
+// Back button + centered title on one row, used by secondary screens.
+class ScreenHeader extends StatelessWidget {
+  final String title;
+  final VoidCallback onBack;
+
+  const ScreenHeader({super.key, required this.title, required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: BevelButton(
+            onTap: onBack,
+            padding: const EdgeInsets.all(8),
+            child: const Icon(Icons.arrow_back, size: 18, color: Palette.ink),
+          ),
+        ),
+        BevelBox(
+          raised: true,
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
+        ),
+      ],
     );
   }
 }

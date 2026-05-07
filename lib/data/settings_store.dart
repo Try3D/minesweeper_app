@@ -5,11 +5,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 const _kKey = 'settings_v1';
 const _kNameMax = 16;
 
+const int kLongPressDurationMin = 100;
+const int kLongPressDurationMax = 500;
+const int kLongPressDurationDefault = 500;
+
 class SettingsStore extends ChangeNotifier {
   String _playerName = 'Player';
   bool _haptics = true;
   bool _firstClickSafety = true;
   bool _showTimer = true;
+  int _longPressDurationMs = kLongPressDurationDefault;
   bool _loaded = false;
 
   bool get isLoaded => _loaded;
@@ -17,6 +22,7 @@ class SettingsStore extends ChangeNotifier {
   bool get haptics => _haptics;
   bool get firstClickSafety => _firstClickSafety;
   bool get showTimer => _showTimer;
+  int get longPressDurationMs => _longPressDurationMs;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -29,6 +35,8 @@ class SettingsStore extends ChangeNotifier {
         _firstClickSafety =
             (j['firstClickSafety'] as bool?) ?? _firstClickSafety;
         _showTimer = (j['showTimer'] as bool?) ?? _showTimer;
+        _longPressDurationMs =
+            (j['longPressDurationMs'] as int?) ?? _longPressDurationMs;
       } catch (_) {
         // Corrupt — keep defaults.
       }
@@ -46,6 +54,7 @@ class SettingsStore extends ChangeNotifier {
         'haptics': _haptics,
         'firstClickSafety': _firstClickSafety,
         'showTimer': _showTimer,
+        'longPressDurationMs': _longPressDurationMs,
       }),
     );
   }
@@ -81,11 +90,21 @@ class SettingsStore extends ChangeNotifier {
     await _save();
   }
 
+  Future<void> setLongPressDurationMs(int value) async {
+    final clamped =
+        value.clamp(kLongPressDurationMin, kLongPressDurationMax);
+    if (clamped == _longPressDurationMs) return;
+    _longPressDurationMs = clamped;
+    notifyListeners();
+    await _save();
+  }
+
   Future<void> resetAll() async {
     _playerName = 'Player';
     _haptics = true;
     _firstClickSafety = true;
     _showTimer = true;
+    _longPressDurationMs = kLongPressDurationDefault;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kKey);

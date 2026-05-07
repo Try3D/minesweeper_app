@@ -18,27 +18,9 @@ class LevelsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  BevelButton(
-                    onTap: () => Navigator.of(context).pop(),
-                    padding: const EdgeInsets.all(8),
-                    child: const Icon(Icons.arrow_back,
-                        size: 18, color: Palette.ink),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Center(
-                child: BevelBox(
-                  raised: true,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
-                  child: Text(
-                    'DIFFICULTY',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                ),
+              ScreenHeader(
+                title: 'DIFFICULTY',
+                onBack: () => Navigator.of(context).pop(),
               ),
               const SizedBox(height: 22),
               const _LevelCard(difficulty: Difficulty.beginner),

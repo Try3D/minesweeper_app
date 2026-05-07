@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../app_scope.dart';
+import '../data/saved_game_store.dart';
 import '../game/board.dart';
 import '../theme.dart';
 import '../widgets/bevel.dart';
@@ -11,7 +12,15 @@ import '../widgets/led_display.dart';
 
 class GameScreen extends StatefulWidget {
   final Difficulty difficulty;
-  const GameScreen({super.key, required this.difficulty});
+  final Board? savedBoard;
+  final int savedSeconds;
+
+  const GameScreen({
+    super.key,
+    required this.difficulty,
+    this.savedBoard,
+    this.savedSeconds = 0,
+  });
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -19,6 +28,7 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   late Board _board;
+  late SavedGameStore _savedGame;
   Timer? _timer;
   int _seconds = 0;
   final TransformationController _viewer = TransformationController();
@@ -29,9 +39,17 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _savedGame = AppScope.savedGameOf(context);
     if (!_boardInitialized) {
-      final safe = AppScope.settingsOf(context).firstClickSafety;
-      _board = Board.fromDifficulty(widget.difficulty, safeFirstClick: safe);
+      if (widget.savedBoard != null) {
+        _board = widget.savedBoard!;
+        _seconds = widget.savedSeconds;
+        // Resume timer immediately since the game is already in progress.
+        WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStartTimer());
+      } else {
+        final safe = AppScope.settingsOf(context).firstClickSafety;
+        _board = Board.fromDifficulty(widget.difficulty, safeFirstClick: safe);
+      }
       _boardInitialized = true;
     }
   }
@@ -53,6 +71,10 @@ class _GameScreenState extends State<GameScreen> {
   void dispose() {
     _timer?.cancel();
     _viewer.dispose();
+    if (_board.status == GameStatus.playing) {
+      _savedGame
+          .save(_board, widget.difficulty, _seconds);
+    }
     super.dispose();
   }
 
@@ -71,6 +93,7 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _reset() {
+    _savedGame.clear();
     final safe = AppScope.settingsOf(context).firstClickSafety;
     setState(() {
       _board = Board.fromDifficulty(widget.difficulty, safeFirstClick: safe);
@@ -96,6 +119,7 @@ class _GameScreenState extends State<GameScreen> {
         break;
       case RevealResult.exploded:
         _haptic(HapticFeedback.heavyImpact);
+        _savedGame.clear();
         AppScope.scoresOf(context).recordLoss(widget.difficulty);
         Future.delayed(const Duration(milliseconds: 250), () {
           if (mounted) _showEndDialog(won: false);
@@ -103,6 +127,7 @@ class _GameScreenState extends State<GameScreen> {
         break;
       case RevealResult.won:
         _haptic(HapticFeedback.lightImpact);
+        _savedGame.clear();
         Future.delayed(const Duration(milliseconds: 80), () {
           if (_hapticsOn()) HapticFeedback.lightImpact();
         });
@@ -214,17 +239,18 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildGrid(double cellSize) {
+    final longPressDuration = Duration(
+      milliseconds: AppScope.settingsOf(context).longPressDurationMs,
+    );
     final rows = <Widget>[];
     for (int r = 0; r < widget.difficulty.height; r++) {
       final row = <Widget>[];
       for (int c = 0; c < widget.difficulty.width; c++) {
-        row.add(GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => setState(() => _pressing = true),
-          onTapUp: (_) => setState(() => _pressing = false),
-          onTapCancel: () => setState(() => _pressing = false),
+        row.add(_CellGesture(
+          longPressDuration: longPressDuration,
           onTap: () => _handleTap(r, c),
           onLongPress: () => _handleLongPress(r, c),
+          onPressingChanged: (v) => setState(() => _pressing = v),
           child: RepaintBoundary(
             child: CellWidget(cell: _board.grid[r][c], size: cellSize),
           ),
@@ -318,6 +344,80 @@ class _GameScreenState extends State<GameScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _CellGesture extends StatefulWidget {
+  final Duration longPressDuration;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+  final ValueChanged<bool> onPressingChanged;
+  final Widget child;
+
+  const _CellGesture({
+    required this.longPressDuration,
+    required this.onTap,
+    required this.onLongPress,
+    required this.onPressingChanged,
+    required this.child,
+  });
+
+  @override
+  State<_CellGesture> createState() => _CellGestureState();
+}
+
+class _CellGestureState extends State<_CellGesture> {
+  Timer? _timer;
+  Offset? _downPosition;
+  bool _longFired = false;
+
+  static const double _slop = 12.0;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _cancel() {
+    _timer?.cancel();
+    _timer = null;
+    _downPosition = null;
+    widget.onPressingChanged(false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (e) {
+        _longFired = false;
+        _downPosition = e.localPosition;
+        widget.onPressingChanged(true);
+        _timer = Timer(widget.longPressDuration, () {
+          if (!mounted) return;
+          _longFired = true;
+          _downPosition = null;
+          widget.onPressingChanged(false);
+          widget.onLongPress();
+        });
+      },
+      onPointerMove: (e) {
+        if (_downPosition == null) return;
+        if ((e.localPosition - _downPosition!).distance > _slop) _cancel();
+      },
+      onPointerUp: (e) {
+        final fired = _longFired;
+        final wasDown = _downPosition != null;
+        _timer?.cancel();
+        _timer = null;
+        _downPosition = null;
+        widget.onPressingChanged(false);
+        if (!fired && wasDown) widget.onTap();
+      },
+      onPointerCancel: (_) => _cancel(),
+      child: widget.child,
     );
   }
 }

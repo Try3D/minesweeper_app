@@ -272,6 +272,62 @@ class Board {
   }
 
   int get minesRemaining => mineCount - flagCount;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'width': width,
+      'height': height,
+      'mineCount': mineCount,
+      'safeFirstClick': safeFirstClick,
+      'status': status.name,
+      'minesPlaced': _minesPlaced,
+      'revealedCount': revealedCount,
+      'flagCount': flagCount,
+      'grid': List.generate(
+        height,
+        (r) => List.generate(width, (c) {
+          final cell = grid[r][c];
+          return {
+            'mine': cell.isMine,
+            'revealed': cell.isRevealed,
+            'flagged': cell.isFlagged,
+            'exploded': cell.exploded,
+            'adj': cell.adjacent,
+          };
+        }),
+      ),
+    };
+  }
+
+  static Board fromJson(Map<String, dynamic> j) {
+    final board = Board(
+      width: j['width'] as int,
+      height: j['height'] as int,
+      mineCount: j['mineCount'] as int,
+      safeFirstClick: j['safeFirstClick'] as bool? ?? true,
+    );
+    board.status = GameStatus.values.firstWhere(
+      (s) => s.name == j['status'],
+      orElse: () => GameStatus.playing,
+    );
+    board._minesPlaced = j['minesPlaced'] as bool? ?? true;
+    board.revealedCount = j['revealedCount'] as int? ?? 0;
+    board.flagCount = j['flagCount'] as int? ?? 0;
+    final rawGrid = j['grid'] as List<dynamic>;
+    for (int r = 0; r < board.height; r++) {
+      final rawRow = rawGrid[r] as List<dynamic>;
+      for (int c = 0; c < board.width; c++) {
+        final raw = rawRow[c] as Map<String, dynamic>;
+        final cell = board.grid[r][c];
+        cell.isMine = raw['mine'] as bool? ?? false;
+        cell.isRevealed = raw['revealed'] as bool? ?? false;
+        cell.isFlagged = raw['flagged'] as bool? ?? false;
+        cell.exploded = raw['exploded'] as bool? ?? false;
+        cell.adjacent = raw['adj'] as int? ?? 0;
+      }
+    }
+    return board;
+  }
 }
 
 enum RevealResult { noop, revealed, exploded, won }

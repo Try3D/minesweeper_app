@@ -51,27 +51,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      BevelButton(
-                        onTap: () => Navigator.of(context).pop(),
-                        padding: const EdgeInsets.all(8),
-                        child: const Icon(Icons.arrow_back,
-                            size: 18, color: Palette.ink),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Center(
-                    child: BevelBox(
-                      raised: true,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      child: Text(
-                        'OPTIONS',
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                    ),
+                  ScreenHeader(
+                    title: 'OPTIONS',
+                    onBack: () => Navigator.of(context).pop(),
                   ),
                   const SizedBox(height: 22),
                   _SectionLabel('PLAYER'),
@@ -99,6 +81,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     label: 'SAFE FIRST CLICK',
                     value: _settings.firstClickSafety,
                     onChanged: _settings.setFirstClickSafety,
+                  ),
+                  const SizedBox(height: 8),
+                  _SliderRow(
+                    label: 'HOLD TO FLAG',
+                    value: _settings.longPressDurationMs,
+                    min: kLongPressDurationMin,
+                    max: kLongPressDurationMax,
+                    onChanged: _settings.setLongPressDurationMs,
                   ),
                   const SizedBox(height: 28),
                   _SectionLabel('RESET'),
@@ -227,6 +217,71 @@ class _NameField extends StatelessWidget {
           counterText: '',
           hintText: 'PLAYER',
         ),
+      ),
+    );
+  }
+}
+
+class _SliderRow extends StatelessWidget {
+  final String label;
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  static const int _step = 100;
+
+  const _SliderRow({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final canDec = value > min;
+    final canInc = value < max;
+    return BevelBox(
+      raised: true,
+      thickness: 2,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label,
+                style: Theme.of(context).textTheme.labelLarge),
+          ),
+          BevelButton(
+            onTap: canDec ? () => onChanged(value - _step) : null,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Text('<',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: canDec ? null : Palette.ink.withValues(alpha: 0.3),
+                    )),
+          ),
+          const SizedBox(width: 6),
+          BevelBox(
+            raised: false,
+            thickness: 2,
+            fill: Palette.cellRevealed,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Text(
+              '${value}MS',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+          ),
+          const SizedBox(width: 6),
+          BevelButton(
+            onTap: canInc ? () => onChanged(value + _step) : null,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Text('>',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: canInc ? null : Palette.ink.withValues(alpha: 0.3),
+                    )),
+          ),
+        ],
       ),
     );
   }
